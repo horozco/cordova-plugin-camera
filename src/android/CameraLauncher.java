@@ -532,6 +532,7 @@ private String ouputModifiedBitmap(Bitmap bitmap, Uri uri) throws IOException {
      */
     private void processResultFromGallery(int destType, Intent intent) {
         Uri uri = intent.getData();
+        String realPath = FileHelper.getRealPath(uri, this.cordova);
         if (uri == null) {
             if (croppedUri != null) {
                 uri = croppedUri;
@@ -542,9 +543,11 @@ private String ouputModifiedBitmap(Bitmap bitmap, Uri uri) throws IOException {
         }
         int rotate = 0;
 
-        // If you ask for video or all media type you will automatically get back a file URI
+        // If you ask for video type, or you ask for all media type and the selected type is not an image
+        // you will automatically get back a file URI
         // and there will be no attempt to resize any returned data
-        if (this.mediaType != PICTURE) {
+        String type = cordova.getActivity().getContentResolver().getType(uri);
+        if (this.mediaType != PICTURE &&  !type.contains("image")) {
             this.callbackContext.success(uri.toString());
         }
         else {
@@ -576,7 +579,7 @@ private String ouputModifiedBitmap(Bitmap bitmap, Uri uri) throws IOException {
                 }
 
                 if (this.correctOrientation) {
-                    rotate = getImageOrientation(uri);
+                    rotate = getImageOrientation(realPath);
                     if (rotate != 0) {
                         Matrix matrix = new Matrix();
                         matrix.setRotate(rotate);
@@ -703,20 +706,15 @@ private String ouputModifiedBitmap(Bitmap bitmap, Uri uri) throws IOException {
         }
     }
 
-    private int getImageOrientation(Uri uri) {
+    private int getImageOrientation(String realPath) {
         int rotate = 0;
-        String[] cols = { MediaStore.Images.Media.ORIENTATION };
-        try {
-            Cursor cursor = cordova.getActivity().getContentResolver().query(uri,
-                    cols, null, null, null);
-            if (cursor != null) {
-                cursor.moveToPosition(0);
-                rotate = cursor.getInt(0);
-                cursor.close();
-            }
-        } catch (Exception e) {
-            // You can get an IllegalArgumentException if ContentProvider doesn't support querying for orientation.
+        ExifHelper exif = new ExifHelper();
+        try{
+          exif.createInFile(realPath);
+        } catch (Exception e) { 
         }
+        exif.readExifData();
+        rotate = exif.getOrientation();
         return rotate;
     }
 
